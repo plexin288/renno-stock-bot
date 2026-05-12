@@ -51,19 +51,42 @@ def analyze_stock(df, stock):
 
     try:
 
-        close_now = df['Close'].iloc[-1]
-        close_prev = df['Close'].iloc[-2]
+        # =====================================
+        # AMBIL DATA TERAKHIR
+        # =====================================
+
+        close_now = float(df['Close'].iloc[-1])
+        close_prev = float(df['Close'].iloc[-2])
+
+        open_price = float(df['Open'].iloc[-1])
+        high_price = float(df['High'].iloc[-1])
+
+        today_volume = float(df['Volume'].iloc[-1])
+
+        # =====================================
+        # CHANGE %
+        # =====================================
 
         change_percent = (
             (close_now - close_prev)
             / close_prev
         ) * 100
 
-        # FILTER NAIK >7%
+        # FILTER SAHAM NAIK >7%
         if change_percent < 7:
             return None
 
-        # RSI
+        # =====================================
+        # FILTER VOLUME
+        # =====================================
+
+        if today_volume < 500000:
+            return None
+
+        # =====================================
+        # RSI 14
+        # =====================================
+
         delta = df['Close'].diff()
 
         gain = delta.clip(lower=0)
@@ -76,43 +99,50 @@ def analyze_stock(df, stock):
 
         rsi = 100 - (100 / (1 + rs))
 
-        current_rsi = round(rsi.iloc[-1], 2)
+        current_rsi = round(float(rsi.iloc[-1]), 2)
 
+        # =====================================
         # MACD
+        # =====================================
+
         exp1 = df['Close'].ewm(span=12).mean()
         exp2 = df['Close'].ewm(span=26).mean()
 
         macd = exp1 - exp2
         signal = macd.ewm(span=9).mean()
 
-        macd_bullish = (
-            macd.iloc[-1] > signal.iloc[-1]
-        )
+        macd_now = float(macd.iloc[-1])
+        signal_now = float(signal.iloc[-1])
 
-        # VOLUME
-        avg_volume = df['Volume'].tail(20).mean()
-        today_volume = df['Volume'].iloc[-1]
+        macd_bullish = macd_now > signal_now
+
+        # =====================================
+        # VOLUME SURGE
+        # =====================================
+
+        avg_volume = float(
+            df['Volume'].tail(20).mean()
+        )
 
         volume_surge = (
             today_volume > avg_volume * 1.5
         )
 
-        # FILTER SAHAM TIDUR
-        if today_volume < 500000:
-            return None
-
+        # =====================================
         # SUPPORT RESISTANCE
-        support = int(
+        # =====================================
+
+        support = int(float(
             df['Low'].tail(20).min()
-        )
+        ))
 
-        resistance = int(
+        resistance = int(float(
             df['High'].tail(20).max()
-        )
+        ))
 
+        # =====================================
         # FOREIGN FLOW
-        open_price = df['Open'].iloc[-1]
-        high_price = df['High'].iloc[-1]
+        # =====================================
 
         transaction_value = (
             close_now * today_volume
@@ -136,13 +166,21 @@ def analyze_stock(df, stock):
 
             foreign_flow = "Outflow"
 
+        # =====================================
         # BANDAR DETECTOR
-        ma20 = df['Close'].rolling(20).mean()
+        # =====================================
+
+        ma20 = float(
+            df['Close']
+            .rolling(20)
+            .mean()
+            .iloc[-1]
+        )
 
         bandar_detected = False
 
         if (
-            close_now > ma20.iloc[-1] and
+            close_now > ma20 and
             today_volume > avg_volume * 1.8 and
             close_now >= high_price * 0.97 and
             change_percent > 5
@@ -150,7 +188,10 @@ def analyze_stock(df, stock):
 
             bandar_detected = True
 
+        # =====================================
         # SCORE
+        # =====================================
+
         score = 0
 
         if volume_surge:
@@ -165,7 +206,10 @@ def analyze_stock(df, stock):
         if foreign_flow == "Strong Inflow":
             score += 3
 
+        # =====================================
         # AI ANALYSIS
+        # =====================================
+
         analysis = ""
 
         if macd_bullish:
@@ -183,7 +227,10 @@ def analyze_stock(df, stock):
         if current_rsi < 70:
             analysis += "Belum overbought."
 
+        # =====================================
         # OUTPUT
+        # =====================================
+
         result_text = f"""
 🚀 {stock}
 
@@ -240,6 +287,7 @@ async def scan(update: Update,
                 period="3mo",
                 interval="1d",
                 progress=False,
+                auto_adjust=True,
                 threads=False
             )
 
@@ -265,6 +313,7 @@ async def scan(update: Update,
 
         return
 
+    # SORT
     results = sorted(
         results,
         key=lambda x: (
@@ -276,6 +325,7 @@ async def scan(update: Update,
 
     top_25 = results[:25]
 
+    # OUTPUT
     final_text = "🔥 TOP GAINERS IDX\n\n"
 
     for item in top_25:
