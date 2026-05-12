@@ -51,30 +51,196 @@ def analyze_stock(df, stock):
 
     try:
 
-        # =====================================
-        # AMBIL DATA TERAKHIR
-        # =====================================
+        # FIX MULTI INDEX
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
 
-        close_now = float(df['Close'].iloc[-1])
-        close_prev = float(df['Close'].iloc[-2])
+        close = df["Close"]
+        openp = df["Open"]
+        high = df["High"]
+        low = df["Low"]
+        volume = df["Volume"]
 
-        open_price = float(df['Open'].iloc[-1])
-        high_price = float(df['High'].iloc[-1])
+        # DATA TERAKHIR
+        close_now = float(close.values[-1])
+        close_prev = float(close.values[-2])
 
-        today_volume = float(df['Volume'].iloc[-1])
+        open_price = float(openp.values[-1])
+        high_price = float(high.values[-1])
 
-        # =====================================
+        today_volume = float(volume.values[-1])
+
         # CHANGE %
-        # =====================================
-
         change_percent = (
             (close_now - close_prev)
             / close_prev
         ) * 100
 
-        # FILTER SAHAM NAIK >7%
+        # FILTER >7%
         if change_percent < 7:
             return None
+
+        # FILTER VOLUME
+        if today_volume < 500000:
+            return None
+
+        # RSI
+        delta = close.diff()
+
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+
+        avg_gain = gain.rolling(14).mean()
+        avg_loss = loss.rolling(14).mean()
+
+        rs = avg_gain / avg_loss
+
+        rsi = 100 - (100 / (1 + rs))
+
+        current_rsi = round(
+            float(rsi.values[-1]),
+            2
+        )
+
+        # MACD
+        exp1 = close.ewm(span=12).mean()
+        exp2 = close.ewm(span=26).mean()
+
+        macd = exp1 - exp2
+        signal = macd.ewm(span=9).mean()
+
+        macd_now = float(macd.values[-1])
+        signal_now = float(signal.values[-1])
+
+        macd_bullish = macd_now > signal_now
+
+        # VOLUME SURGE
+        avg_volume = float(
+            volume.tail(20).mean()
+        )
+
+        volume_surge = (
+            today_volume > avg_volume * 1.5
+        )
+
+        # SUPPORT RESISTANCE
+        support = int(
+            float(low.tail(20).min())
+        )
+
+        resistance = int(
+            float(high.tail(20).max())
+        )
+
+        # FOREIGN FLOW
+        transaction_value = (
+            close_now * today_volume
+        )
+
+        foreign_flow = "Neutral"
+
+        if (
+            close_now > open_price and
+            today_volume > avg_volume * 2 and
+            close_now >= high_price * 0.98 and
+            transaction_value > 10_000_000_000
+        ):
+
+            foreign_flow = "Strong Inflow"
+
+        elif (
+            close_now < open_price and
+            today_volume > avg_volume * 2
+        ):
+
+            foreign_flow = "Outflow"
+
+        # BANDAR DETECTOR
+        ma20 = float(
+            close
+            .rolling(20)
+            .mean()
+            .values[-1]
+        )
+
+        bandar_detected = False
+
+        if (
+            close_now > ma20 and
+            today_volume > avg_volume * 1.8 and
+            close_now >= high_price * 0.97 and
+            change_percent > 5
+        ):
+
+            bandar_detected = True
+
+        # SCORE
+        score = 0
+
+        if volume_surge:
+            score += 2
+
+        if macd_bullish:
+            score += 2
+
+        if bandar_detected:
+            score += 3
+
+        if foreign_flow == "Strong Inflow":
+            score += 3
+
+        # AI ANALYSIS
+        analysis = ""
+
+        if macd_bullish:
+            analysis += "MACD bullish. "
+
+        if volume_surge:
+            analysis += "Volume surge tinggi. "
+
+        if bandar_detected:
+            analysis += "Terindikasi akumulasi bandar. "
+
+        if foreign_flow == "Strong Inflow":
+            analysis += "Ada indikasi foreign inflow. "
+
+        if current_rsi < 70:
+            analysis += "Belum overbought."
+
+        # OUTPUT
+        result_text = f'''
+🚀 {stock}
+
+📈 Change: {change_percent:.2f}%
+⭐ Score: {score}/10
+
+📊 RSI: {current_rsi}
+📦 Volume Surge: {"YES" if volume_surge else "NO"}
+
+🌍 Foreign Flow:
+{foreign_flow}
+
+🏦 Bandar Detector:
+{"ACCUMULATION DETECTED" if bandar_detected else "NO DETECTION"}
+
+🛡 Support: {support}
+🎯 Resistance: {resistance}
+
+🧠 AI Analysis:
+{analysis}
+'''
+
+        return {
+            "change": change_percent,
+            "score": score,
+            "text": result_text
+        }
+
+    except Exception as e:
+
+        print(f"{stock} ERROR: {e}")
+
+        return None
 
         # =====================================
         # FILTER VOLUME
