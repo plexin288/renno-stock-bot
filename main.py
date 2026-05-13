@@ -37,8 +37,11 @@ IDX_STOCKS = [
     # PROPERTY
     "BSDE.JK","PWON.JK","CTRA.JK","SMRA.JK",
 
-    # BANK
-    "BRIS.JK","BBTN.JK","BJBR.JK","BJTM.JK",
+    # LOW PRICE MOMENTUM
+    "ABBA.JK","HUMA.JK","CBRE.JK","DOOH.JK",
+    "SOTS.JK","NICL.JK","KKGI.JK","WIFI.JK",
+    "FILM.JK","TMAS.JK","BKSL.JK","CARE.JK",
+    "JGLE.JK","ZYRX.JK","GPSO.JK","MHKI.JK",
 
     # RETAIL & CONSUMER
     "AMRT.JK","ACES.JK","ERAA.JK","MAPI.JK",
@@ -56,11 +59,7 @@ IDX_STOCKS = [
     # HIGH MOMENTUM
     "BREN.JK","CUAN.JK","TPIA.JK","RAJA.JK",
     "WIFI.JK","ARTO.JK","TMAS.JK","PANI.JK",
-    "FILM.JK","NCKL.JK","MBMA.JK",
-
-    # TRADER FAVORITES
-    "ABBA.JK","HUMA.JK","CBRE.JK","SOTS.JK",
-    "DOOH.JK","KKGI.JK","NICL.JK"
+    "FILM.JK","NCKL.JK","MBMA.JK"
 ]
 
 # =========================================
@@ -189,6 +188,36 @@ def analyze_stock(df, stock):
         )
 
         # =========================================
+        # BREAKOUT DETECTOR
+        # =========================================
+
+        recent_resistance = float(
+            high.tail(20).max()
+        )
+
+        breakout_valid = (
+            close_now >= recent_resistance * 0.99
+        )
+
+        # =========================================
+        # FAKE BREAKOUT FILTER
+        # =========================================
+
+        fake_breakout = False
+
+        if (
+            breakout_valid and
+            volume_now < avg_volume and
+            close_now < high_now * 0.97
+        ):
+
+            fake_breakout = True
+
+        # SKIP FAKE BREAKOUT
+        if fake_breakout:
+            return None
+
+        # =========================================
         # SUPPORT & RESISTANCE
         # =========================================
 
@@ -258,7 +287,8 @@ def analyze_stock(df, stock):
             macd_bullish and
             volume_surge and
             bandar_detected and
-            trend_bullish
+            trend_bullish and
+            breakout_valid
         ):
 
             status_signal = "STRONG BUY"
@@ -272,7 +302,7 @@ def analyze_stock(df, stock):
         tp1 = round(close_now * 1.05, 0)
         tp2 = round(close_now * 1.10, 0)
 
-        sl = round(close_now * 0.95, 0)
+        sl = round(support * 0.98, 0)
 
         # =========================================
         # SCORE
@@ -292,6 +322,9 @@ def analyze_stock(df, stock):
         if trend_bullish:
             score += 2
 
+        if breakout_valid:
+            score += 2
+
         if foreign_flow == "Strong Inflow":
             score += 1
 
@@ -300,6 +333,9 @@ def analyze_stock(df, stock):
         # =========================================
 
         analysis = []
+
+        if breakout_valid:
+            analysis.append("Breakout resistance")
 
         if macd_bullish:
             analysis.append("MACD bullish")
@@ -326,12 +362,18 @@ def analyze_stock(df, stock):
 🚀 {stock}
 
 📈 Change: +{change_percent}%
-⭐ Score: {score}/10
+⭐ Score: {score}/12
 🔥 Status: {status_signal}
 
 📊 RSI: {current_rsi}
 📦 Volume Surge: {"YES" if volume_surge else "NO"}
 📉 MACD: {"BULLISH" if macd_bullish else "BEARISH"}
+
+📈 Breakout:
+{"VALID" if breakout_valid else "NO"}
+
+🚫 Fake Breakout:
+{"YES" if fake_breakout else "NO"}
 
 🌍 Foreign Flow:
 {foreign_flow}
@@ -457,6 +499,8 @@ async def start(update: Update,
 ✅ MACD
 ✅ MA20 vs MA50
 ✅ Volume Surge
+✅ Breakout Detector
+✅ Fake Breakout Filter
 ✅ Foreign Flow
 ✅ Bandar Detector
 ✅ Entry TP SL
