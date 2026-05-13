@@ -7,47 +7,38 @@ import pandas as pd
 # =========================================
 
 st.set_page_config(
-    page_title="RENNO STOCK SCANNER",
+    page_title="RENNO STOCK DASHBOARD",
     layout="wide"
 )
 
 # =========================================
-# WATCHLIST
+# WATCHLIST 30 SAHAM
 # =========================================
 
 IDX_STOCKS = [
 
-    "ADRO.JK","ADMR.JK","ITMG.JK","PTBA.JK",
-    "HRUM.JK","INDY.JK","BUMI.JK","DOID.JK",
-    "MEDC.JK","PGAS.JK","ESSA.JK",
+    "BREN.JK","CUAN.JK","TPIA.JK","RAJA.JK",
+    "WIFI.JK","ARTO.JK","TMAS.JK","PANI.JK",
+    "FILM.JK","NCKL.JK","MBMA.JK","ABBA.JK",
 
-    "ANTM.JK","MDKA.JK","INCO.JK","BRMS.JK",
-    "PSAB.JK","DKFT.JK",
+    "HUMA.JK","CBRE.JK","DOOH.JK","SOTS.JK",
+    "NICL.JK","KKGI.JK","BKSL.JK","CARE.JK",
 
     "GOTO.JK","BUKA.JK","DNET.JK","EDGE.JK",
 
-    "BSDE.JK","PWON.JK","CTRA.JK","SMRA.JK",
+    "ADRO.JK","ANTM.JK","MDKA.JK","BRMS.JK",
 
-    "ABBA.JK","HUMA.JK","CBRE.JK","DOOH.JK",
-    "SOTS.JK","NICL.JK","KKGI.JK","WIFI.JK",
-    "FILM.JK","TMAS.JK","BKSL.JK","CARE.JK",
-
-    "EXCL.JK","ISAT.JK","TLKM.JK",
-
-    "HEAL.JK","MIKA.JK","SILO.JK",
-
-    "BREN.JK","CUAN.JK","TPIA.JK","RAJA.JK",
-    "ARTO.JK","PANI.JK","NCKL.JK","MBMA.JK"
+    "EXCL.JK","ISAT.JK"
 ]
 
 # =========================================
 # TITLE
 # =========================================
 
-st.title("🚀 RENNO STOCK SCANNER")
+st.title("🚀 RENNO STOCK DASHBOARD")
 
 st.markdown("""
-Realtime momentum stock dashboard IDX
+Monitor saham harian IDX
 """)
 
 # =========================================
@@ -86,10 +77,6 @@ def scan_stock(stock):
         ) * 100
 
         change_percent = round(change_percent, 2)
-
-        # FILTER >7%
-        if change_percent < 7:
-            return None
 
         # RSI
         delta = close.diff()
@@ -174,6 +161,7 @@ def scan_stock(stock):
         return {
 
             "Stock": stock,
+            "Price": round(close_now, 0),
             "Change %": change_percent,
             "RSI": current_rsi,
             "Volume Surge": (
@@ -230,12 +218,12 @@ if results:
     col1, col2, col3 = st.columns(3)
 
     col1.metric(
-        "🔥 Total Momentum Stocks",
+        "📊 Total Stocks",
         len(df_results)
     )
 
     col2.metric(
-        "🚀 Strong Buy",
+        "🔥 Strong Buy",
         len(
             df_results[
                 df_results["Status"]
@@ -245,13 +233,13 @@ if results:
     )
 
     col3.metric(
-        "📈 Highest Gain",
+        "🚀 Top Gainer",
         f"{df_results.iloc[0]['Change %']}%"
     )
 
     st.divider()
 
-    st.subheader("📊 TOP MOMENTUM STOCKS")
+    st.subheader("📈 STOCK MONITOR")
 
     st.dataframe(
         df_results,
@@ -261,5 +249,5 @@ if results:
 else:
 
     st.warning(
-        "Tidak ada saham >7% hari ini."
+        "Tidak ada data saham."
     )
