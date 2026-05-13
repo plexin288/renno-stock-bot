@@ -17,13 +17,13 @@ import asyncio
 TOKEN = os.getenv("TOKEN")
 
 # =========================================
-# WATCHLIST SAHAM MOMENTUM IDX
+# WATCHLIST MOMENTUM IDX
 # =========================================
 
 IDX_STOCKS = [
 
     # ENERGY & COAL
-    "ADRO.JK","ADMR.JK","BRMS.JK","PTBA.JK",
+    "ADRO.JK","ADMR.JK","ITMG.JK","PTBA.JK",
     "HRUM.JK","INDY.JK","BUMI.JK","DOID.JK",
     "MEDC.JK","PGAS.JK","ESSA.JK",
 
@@ -35,7 +35,7 @@ IDX_STOCKS = [
     "GOTO.JK","BUKA.JK","DNET.JK","EDGE.JK",
 
     # PROPERTY
-    "BSDE.JK","PWON.JK","CBDK.JK","SMRA.JK",
+    "BSDE.JK","PWON.JK","CTRA.JK","SMRA.JK",
 
     # BANK
     "BRIS.JK","BBTN.JK","BJBR.JK","BJTM.JK",
@@ -85,7 +85,6 @@ def analyze_stock(df, stock):
         low = df["Low"]
         volume = df["Volume"]
 
-        # DATA TERBARU
         close_now = float(close.iloc[-1])
         close_prev = float(close.iloc[-2])
 
@@ -113,7 +112,7 @@ def analyze_stock(df, stock):
 
         change_percent = round(change_percent, 2)
 
-        # FILTER WAJIB >7%
+        # FILTER >7%
         if change_percent < 7:
             return None
 
@@ -121,7 +120,7 @@ def analyze_stock(df, stock):
         if volume_now < 500000:
             return None
 
-        # FILTER HARGA MINIMAL
+        # FILTER HARGA
         if close_now < 50:
             return None
 
@@ -164,7 +163,7 @@ def analyze_stock(df, stock):
         )
 
         # =========================================
-        # MOVING AVERAGE
+        # MA20 vs MA50
         # =========================================
 
         ma20 = float(
@@ -244,7 +243,7 @@ def analyze_stock(df, stock):
         # STATUS SIGNAL
         # =========================================
 
-        status = "WEAK"
+        status_signal = "WEAK"
 
         if (
             change_percent >= 7 and
@@ -252,7 +251,7 @@ def analyze_stock(df, stock):
             volume_surge
         ):
 
-            status = "GOOD"
+            status_signal = "GOOD"
 
         if (
             change_percent >= 10 and
@@ -262,7 +261,7 @@ def analyze_stock(df, stock):
             trend_bullish
         ):
 
-            status = "STRONG BUY"
+            status_signal = "STRONG BUY"
 
         # =========================================
         # ENTRY TP SL
@@ -274,11 +273,6 @@ def analyze_stock(df, stock):
         tp2 = round(close_now * 1.10, 0)
 
         sl = round(close_now * 0.95, 0)
-
-        risk_reward = round(
-            ((tp2 - entry) / (entry - sl)),
-            2
-        )
 
         # =========================================
         # SCORE
@@ -333,7 +327,7 @@ def analyze_stock(df, stock):
 
 📈 Change: +{change_percent}%
 ⭐ Score: {score}/10
-🔥 Status: {status}
+🔥 Status: {status_signal}
 
 📊 RSI: {current_rsi}
 📦 Volume Surge: {"YES" if volume_surge else "NO"}
@@ -354,8 +348,6 @@ def analyze_stock(df, stock):
 🎯 TP1   : {int(tp1)}
 🚀 TP2   : {int(tp2)}
 🛑 SL    : {int(sl)}
-
-⚖️ Risk Reward: 1:{risk_reward}
 
 🧠 AI Analysis:
 {ai_text}
@@ -419,7 +411,7 @@ async def scan(update: Update,
 
         return
 
-    # SORTING
+    # SORT
     results = sorted(
         results,
         key=lambda x: (
@@ -475,6 +467,59 @@ async def start(update: Update,
 /scan
 /status
 /help
+"""
+
+    await update.message.reply_text(text)
+
+# =========================================
+# COMMAND /STATUS
+# =========================================
+
+async def status(update: Update,
+                 context: ContextTypes.DEFAULT_TYPE):
+
+    text = f"""
+🟢 RENNO BOT STATUS
+
+📡 Data Source:
+Yahoo Finance
+
+⚡ Scanner:
+ACTIVE
+
+📊 Watchlist:
+{len(IDX_STOCKS)} saham
+
+🔥 Filter:
+Only stocks >7%
+
+🤖 System:
+RUNNING NORMAL
+"""
+
+    await update.message.reply_text(text)
+
+# =========================================
+# COMMAND /HELP
+# =========================================
+
+async def help_command(update: Update,
+                       context: ContextTypes.DEFAULT_TYPE):
+
+    text = """
+📖 RENNO BOT COMMANDS
+
+/start
+➡️ Menu utama
+
+/scan
+➡️ Scan saham momentum >7%
+
+/status
+➡️ Check status bot
+
+/help
+➡️ Bantuan command
 """
 
     await update.message.reply_text(text)
