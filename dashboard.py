@@ -1,253 +1,163 @@
-import streamlit as st
+from flask import Flask, render_template_string
 import yfinance as yf
-import pandas as pd
 
-# =========================================
-# PAGE CONFIG
-# =========================================
+app = Flask(__name__)
 
-st.set_page_config(
-    page_title="RENNO STOCK DASHBOARD",
-    layout="wide"
-)
-
-# =========================================
-# WATCHLIST 30 SAHAM
-# =========================================
-
-IDX_STOCKS = [
-
-    "BREN.JK","CUAN.JK","TPIA.JK","RAJA.JK",
-    "WIFI.JK","ARTO.JK","TMAS.JK","PANI.JK",
-    "FILM.JK","NCKL.JK","MBMA.JK","ABBA.JK",
-
-    "HUMA.JK","CBRE.JK","DOOH.JK","SOTS.JK",
-    "NICL.JK","KKGI.JK","BKSL.JK","CARE.JK",
-
-    "GOTO.JK","BUKA.JK","DNET.JK","EDGE.JK",
-
-    "ADRO.JK","ANTM.JK","MDKA.JK","BRMS.JK",
-
-    "EXCL.JK","ISAT.JK"
+stocks = [
+    "BBCA.JK","BBRI.JK","BMRI.JK","BBNI.JK","TLKM.JK",
+    "ASII.JK","ADRO.JK","GOTO.JK","AMRT.JK","ICBP.JK",
+    "INDF.JK","UNVR.JK","MDKA.JK","ANTM.JK","PGAS.JK"
 ]
 
-# =========================================
-# TITLE
-# =========================================
+@app.route("/")
+def dashboard():
 
-st.title("🚀 RENNO STOCK DASHBOARD")
+    results = []
 
-st.markdown("""
-Monitor saham harian IDX
-""")
+    for stock in stocks:
 
-# =========================================
-# SCAN FUNCTION
-# =========================================
+        try:
+            data = yf.download(stock, period="5d", progress=False)
 
-def scan_stock(stock):
+            if data.empty:
+                continue
 
-    try:
+            close_price = round(float(data["Close"].iloc[-1]), 2)
+            prev_price = round(float(data["Close"].iloc[-2]), 2)
 
-        df = yf.download(
-            stock,
-            period="6mo",
-            interval="1d",
-            progress=False,
-            auto_adjust=True,
-            threads=False
-        )
+            change = round(
+                ((close_price - prev_price) / prev_price) * 100,
+                2
+            )
 
-        if df.empty or len(df) < 50:
-            return None
+            signal = "BUY" if change > 0 else "WAIT"
 
-        close = df["Close"]
-        high = df["High"]
-        volume = df["Volume"]
+            trend = (
+                "BULLISH"
+                if change > 1
+                else "SIDEWAYS"
+            )
 
-        close_now = float(close.iloc[-1])
-        close_prev = float(close.iloc[-2])
+            results.append({
+                "stock": stock,
+                "price": close_price,
+                "change": change,
+                "trend": trend,
+                "signal": signal
+            })
 
-        volume_now = float(volume.iloc[-1])
+        except:
+            pass
 
-        # CHANGE %
-        change_percent = (
-            (close_now - close_prev)
-            / close_prev
-        ) * 100
+    html = """
 
-        change_percent = round(change_percent, 2)
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>RENNO STOCK DASHBOARD</title>
 
-        # RSI
-        delta = close.diff()
+        <style>
 
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
+            body{
+                background:#0f172a;
+                color:white;
+                font-family:Arial;
+                padding:40px;
+            }
 
-        avg_gain = gain.rolling(14).mean()
-        avg_loss = loss.rolling(14).mean()
+            h1{
+                font-size:50px;
+                margin-bottom:10px;
+            }
 
-        rs = avg_gain / avg_loss
+            table{
+                width:100%;
+                border-collapse:collapse;
+                margin-top:30px;
+                background:#1e293b;
+                border-radius:20px;
+                overflow:hidden;
+            }
 
-        rsi = 100 - (100 / (1 + rs))
+            th, td{
+                padding:18px;
+                border-bottom:1px solid #334155;
+                text-align:left;
+            }
 
-        current_rsi = round(
-            float(rsi.iloc[-1]),
-            2
-        )
+            th{
+                background:#111827;
+                color:#94a3b8;
+            }
 
-        # MACD
-        exp1 = close.ewm(span=12).mean()
-        exp2 = close.ewm(span=26).mean()
+            tr:hover{
+                background:#334155;
+            }
 
-        macd = exp1 - exp2
-        signal = macd.ewm(span=9).mean()
+            .green{
+                color:#22c55e;
+                font-weight:bold;
+            }
 
-        macd_now = float(macd.iloc[-1])
-        signal_now = float(signal.iloc[-1])
+            .yellow{
+                color:#facc15;
+                font-weight:bold;
+            }
 
-        macd_bullish = (
-            macd_now > signal_now
-        )
+        </style>
+    </head>
 
-        # VOLUME SURGE
-        avg_volume = float(
-            volume.tail(20).mean()
-        )
+    <body>
 
-        volume_surge = (
-            volume_now > avg_volume * 1.5
-        )
+        <h1>🚀 RENNO STOCK DASHBOARD</h1>
+        <p>Realtime IDX Market Monitor</p>
 
-        # BREAKOUT
-        resistance = float(
-            high.tail(20).max()
-        )
+        <table>
 
-        breakout_valid = (
-            close_now >= resistance * 0.99
-        )
+            <thead>
+                <tr>
+                    <th>Stock</th>
+                    <th>Price</th>
+                    <th>Change</th>
+                    <th>Trend</th>
+                    <th>Signal</th>
+                </tr>
+            </thead>
 
-        # STATUS
-        status = "WEAK"
+            <tbody>
 
-        if (
-            macd_bullish and
-            volume_surge
-        ):
+                {% for s in results %}
 
-            status = "GOOD"
+                <tr>
 
-        if (
-            breakout_valid and
-            volume_surge and
-            macd_bullish
-        ):
+                    <td><b>{{ s.stock }}</b></td>
 
-            status = "STRONG BUY"
+                    <td>{{ s.price }}</td>
 
-        # SCORE
-        score = 0
+                    <td class="{{ 'green' if s.change > 0 else 'yellow' }}">
+                        {{ s.change }}%
+                    </td>
 
-        if macd_bullish:
-            score += 2
+                    <td>{{ s.trend }}</td>
 
-        if volume_surge:
-            score += 2
+                    <td class="{{ 'green' if s.signal == 'BUY' else 'yellow' }}">
+                        {{ s.signal }}
+                    </td>
 
-        if breakout_valid:
-            score += 3
+                </tr>
 
-        return {
+                {% endfor %}
 
-            "Stock": stock,
-            "Price": round(close_now, 0),
-            "Change %": change_percent,
-            "RSI": current_rsi,
-            "Volume Surge": (
-                "YES"
-                if volume_surge
-                else "NO"
-            ),
-            "Breakout": (
-                "VALID"
-                if breakout_valid
-                else "NO"
-            ),
-            "Score": score,
-            "Status": status
+            </tbody>
 
-        }
+        </table>
 
-    except:
-        return None
+    </body>
+    </html>
 
-# =========================================
-# SCANNING
-# =========================================
+    """
 
-results = []
+    return render_template_string(html, results=results)
 
-progress = st.progress(0)
-
-for i, stock in enumerate(IDX_STOCKS):
-
-    result = scan_stock(stock)
-
-    if result:
-        results.append(result)
-
-    progress.progress(
-        (i + 1) / len(IDX_STOCKS)
-    )
-
-# =========================================
-# DISPLAY
-# =========================================
-
-if results:
-
-    df_results = pd.DataFrame(results)
-
-    df_results = df_results.sort_values(
-        by=["Score", "Change %"],
-        ascending=False
-    )
-
-    # METRICS
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "📊 Total Stocks",
-        len(df_results)
-    )
-
-    col2.metric(
-        "🔥 Strong Buy",
-        len(
-            df_results[
-                df_results["Status"]
-                == "STRONG BUY"
-            ]
-        )
-    )
-
-    col3.metric(
-        "🚀 Top Gainer",
-        f"{df_results.iloc[0]['Change %']}%"
-    )
-
-    st.divider()
-
-    st.subheader("📈 STOCK MONITOR")
-
-    st.dataframe(
-        df_results,
-        use_container_width=True
-    )
-
-else:
-
-    st.warning(
-        "Tidak ada data saham."
-    )
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
