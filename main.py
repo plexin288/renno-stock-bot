@@ -23,7 +23,7 @@ TOKEN = os.getenv("TOKEN")
 IDX_STOCKS = [
 
     # ENERGY & COAL
-    "ADRO.JK","ADMR.JK","ITMG.JK","PTBA.JK",
+    "ADRO.JK","ADMR.JK","BRMS.JK","PTBA.JK",
     "HRUM.JK","INDY.JK","BUMI.JK","DOID.JK",
     "MEDC.JK","PGAS.JK","ESSA.JK",
 
