@@ -5,159 +5,98 @@ app = Flask(__name__)
 
 stocks = [
     "BBCA.JK","BBRI.JK","BMRI.JK","BBNI.JK","TLKM.JK",
-    "ASII.JK","ADRO.JK","GOTO.JK","AMRT.JK","ICBP.JK",
-    "INDF.JK","UNVR.JK","MDKA.JK","ANTM.JK","PGAS.JK"
+    "ASII.JK","ICBP.JK","INDF.JK","ANTM.JK","MDKA.JK",
+    "ADRO.JK","PGAS.JK","UNVR.JK","GOTO.JK","AMRT.JK"
 ]
 
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RENNO STOCK DASHBOARD</title>
+    <meta http-equiv="refresh" content="300">
+    <style>
+        body {
+            background: #0f172a;
+            color: white;
+            font-family: Arial;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #38bdf8;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 12px;
+        }
+
+        .green {
+            color: #22c55e;
+        }
+
+        .red {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+
+<h1>🚀 RENNO STOCK DASHBOARD</h1>
+
+{% for stock in data %}
+<div class="card">
+    <h2>{{ stock.symbol }}</h2>
+    <p>Price: <b>{{ stock.price }}</b></p>
+
+    {% if stock.change >= 0 %}
+        <p class="green">Change: +{{ stock.change }}%</p>
+    {% else %}
+        <p class="red">Change: {{ stock.change }}%</p>
+    {% endif %}
+
+    <p>Volume: {{ stock.volume }}</p>
+</div>
+{% endfor %}
+
+</body>
+</html>
+"""
+
 @app.route("/")
-def dashboard():
+def home():
+    data = []
 
-    results = []
-
-    for stock in stocks:
-
+    for symbol in stocks:
         try:
-            data = yf.download(stock, period="5d", progress=False)
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="2d")
 
-            if data.empty:
+            if len(hist) < 2:
                 continue
 
-            close_price = round(float(data["Close"].iloc[-1]), 2)
-            prev_price = round(float(data["Close"].iloc[-2]), 2)
+            last_price = round(hist["Close"].iloc[-1], 2)
+            prev_price = hist["Close"].iloc[-2]
 
-            change = round(
-                ((close_price - prev_price) / prev_price) * 100,
-                2
-            )
+            change = round(((last_price - prev_price) / prev_price) * 100, 2)
 
-            signal = "BUY" if change > 0 else "WAIT"
+            volume = int(hist["Volume"].iloc[-1])
 
-            trend = (
-                "BULLISH"
-                if change > 1
-                else "SIDEWAYS"
-            )
-
-            results.append({
-                "stock": stock,
-                "price": close_price,
+            data.append({
+                "symbol": symbol,
+                "price": last_price,
                 "change": change,
-                "trend": trend,
-                "signal": signal
+                "volume": f"{volume:,}"
             })
 
-        except:
-            pass
+        except Exception as e:
+            print(f"Error {symbol}: {e}")
 
-    html = """
-
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>RENNO STOCK DASHBOARD</title>
-
-        <style>
-
-            body{
-                background:#0f172a;
-                color:white;
-                font-family:Arial;
-                padding:40px;
-            }
-
-            h1{
-                font-size:50px;
-                margin-bottom:10px;
-            }
-
-            table{
-                width:100%;
-                border-collapse:collapse;
-                margin-top:30px;
-                background:#1e293b;
-                border-radius:20px;
-                overflow:hidden;
-            }
-
-            th, td{
-                padding:18px;
-                border-bottom:1px solid #334155;
-                text-align:left;
-            }
-
-            th{
-                background:#111827;
-                color:#94a3b8;
-            }
-
-            tr:hover{
-                background:#334155;
-            }
-
-            .green{
-                color:#22c55e;
-                font-weight:bold;
-            }
-
-            .yellow{
-                color:#facc15;
-                font-weight:bold;
-            }
-
-        </style>
-    </head>
-
-    <body>
-
-        <h1>🚀 RENNO STOCK DASHBOARD</h1>
-        <p>Realtime IDX Market Monitor</p>
-
-        <table>
-
-            <thead>
-                <tr>
-                    <th>Stock</th>
-                    <th>Price</th>
-                    <th>Change</th>
-                    <th>Trend</th>
-                    <th>Signal</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for s in results %}
-
-                <tr>
-
-                    <td><b>{{ s.stock }}</b></td>
-
-                    <td>{{ s.price }}</td>
-
-                    <td class="{{ 'green' if s.change > 0 else 'yellow' }}">
-                        {{ s.change }}%
-                    </td>
-
-                    <td>{{ s.trend }}</td>
-
-                    <td class="{{ 'green' if s.signal == 'BUY' else 'yellow' }}">
-                        {{ s.signal }}
-                    </td>
-
-                </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </body>
-    </html>
-
-    """
-
-    return render_template_string(html, results=results)
+    return render_template_string(HTML, data=data)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=8080)
