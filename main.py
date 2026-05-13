@@ -473,6 +473,8 @@ async def start(update: Update,
 
 📌 COMMAND:
 /scan
+/status
+/help
 """
 
     await update.message.reply_text(text)
