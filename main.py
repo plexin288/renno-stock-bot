@@ -7,9 +7,8 @@ from telegram.ext import (
 
 import yfinance as yf
 import pandas as pd
-import numpy as np
-import asyncio
 import os
+import asyncio
 
 # =========================================
 # TOKEN BOT
@@ -18,29 +17,50 @@ import os
 TOKEN = os.getenv("TOKEN")
 
 # =========================================
-# LIST SAHAM IDX
+# WATCHLIST SAHAM MOMENTUM IDX
 # =========================================
 
 IDX_STOCKS = [
 
-    "AALI.JK","ABBA.JK","ABDA.JK","ACES.JK",
-    "ACST.JK","ADHI.JK","ADMR.JK","ADRO.JK",
-    "AGII.JK","AKRA.JK","AMRT.JK","ANTM.JK",
-    "ASII.JK","BBCA.JK","BBNI.JK","BBRI.JK",
-    "BBTN.JK","BMRI.JK","BRIS.JK","BRMS.JK",
-    "BSDE.JK","BUMI.JK","BUKA.JK","CPIN.JK",
-    "CTRA.JK","DOID.JK","ELSA.JK","EMTK.JK",
-    "ERAA.JK","ESSA.JK","EXCL.JK","GOTO.JK",
-    "HEAL.JK","HMSP.JK","HRUM.JK","ICBP.JK",
-    "INCO.JK","INDF.JK","INDY.JK","INTP.JK",
-    "ISAT.JK","ITMG.JK","JPFA.JK","KLBF.JK",
-    "LSIP.JK","MAPI.JK","MDKA.JK","MEDC.JK",
-    "MIKA.JK","MYOR.JK","PGAS.JK","PTBA.JK",
-    "PWON.JK","SIDO.JK","SILO.JK","SMGR.JK",
-    "SMRA.JK","TLKM.JK","TPIA.JK","UNTR.JK",
-    "UNVR.JK","ADMF.JK","BFIN.JK","BJBR.JK",
-    "BJTM.JK","CMRY.JK","CUAN.JK","BREN.JK",
-    "CBRE.JK","HUMA.JK","SOTS.JK","DOOH.JK"
+    # ENERGY & COAL
+    "ADRO.JK","ADMR.JK","ITMG.JK","PTBA.JK",
+    "HRUM.JK","INDY.JK","BUMI.JK","DOID.JK",
+    "MEDC.JK","PGAS.JK","ESSA.JK",
+
+    # NICKEL & MINING
+    "ANTM.JK","MDKA.JK","INCO.JK","BRMS.JK",
+    "PSAB.JK","DKFT.JK",
+
+    # TECHNOLOGY
+    "GOTO.JK","BUKA.JK","DNET.JK","EDGE.JK",
+
+    # PROPERTY
+    "BSDE.JK","PWON.JK","CTRA.JK","SMRA.JK",
+
+    # BANK
+    "BRIS.JK","BBTN.JK","BJBR.JK","BJTM.JK",
+
+    # RETAIL & CONSUMER
+    "AMRT.JK","ACES.JK","ERAA.JK","MAPI.JK",
+    "MYOR.JK","ICBP.JK","INDF.JK",
+
+    # TELEKOMUNIKASI
+    "EXCL.JK","ISAT.JK","TLKM.JK",
+
+    # HEALTHCARE
+    "HEAL.JK","MIKA.JK","SILO.JK",
+
+    # INDUSTRIAL
+    "UNTR.JK","SMGR.JK","JPFA.JK","CPIN.JK",
+
+    # HIGH MOMENTUM
+    "BREN.JK","CUAN.JK","TPIA.JK","RAJA.JK",
+    "WIFI.JK","ARTO.JK","TMAS.JK","PANI.JK",
+    "FILM.JK","NCKL.JK","MBMA.JK",
+
+    # TRADER FAVORITES
+    "ABBA.JK","HUMA.JK","CBRE.JK","SOTS.JK",
+    "DOOH.JK","KKGI.JK","NICL.JK"
 ]
 
 # =========================================
@@ -55,36 +75,60 @@ def analyze_stock(df, stock):
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
+        # VALIDASI
+        if df.empty or len(df) < 50:
+            return None
+
         close = df["Close"]
         openp = df["Open"]
         high = df["High"]
         low = df["Low"]
         volume = df["Volume"]
 
-        # DATA TERAKHIR
-        close_now = float(close.values[-1])
-        close_prev = float(close.values[-2])
+        # DATA TERBARU
+        close_now = float(close.iloc[-1])
+        close_prev = float(close.iloc[-2])
 
-        open_price = float(openp.values[-1])
-        high_price = float(high.values[-1])
+        open_now = float(openp.iloc[-1])
+        high_now = float(high.iloc[-1])
 
-        today_volume = float(volume.values[-1])
+        volume_now = float(volume.iloc[-1])
 
+        # VALIDASI DATA
+        if (
+            pd.isna(close_now) or
+            pd.isna(close_prev) or
+            close_prev == 0
+        ):
+            return None
+
+        # =========================================
         # CHANGE %
+        # =========================================
+
         change_percent = (
             (close_now - close_prev)
             / close_prev
         ) * 100
 
-        # FILTER >7%
+        change_percent = round(change_percent, 2)
+
+        # FILTER WAJIB >7%
         if change_percent < 7:
             return None
 
         # FILTER VOLUME
-        if today_volume < 500000:
+        if volume_now < 500000:
             return None
 
-        # RSI
+        # FILTER HARGA MINIMAL
+        if close_now < 50:
+            return None
+
+        # =========================================
+        # RSI 14
+        # =========================================
+
         delta = close.diff()
 
         gain = delta.clip(lower=0)
@@ -98,181 +142,16 @@ def analyze_stock(df, stock):
         rsi = 100 - (100 / (1 + rs))
 
         current_rsi = round(
-            float(rsi.values[-1]),
+            float(rsi.iloc[-1]),
             2
         )
 
+        # =========================================
         # MACD
+        # =========================================
+
         exp1 = close.ewm(span=12).mean()
         exp2 = close.ewm(span=26).mean()
-
-        macd = exp1 - exp2
-        signal = macd.ewm(span=9).mean()
-
-        macd_now = float(macd.values[-1])
-        signal_now = float(signal.values[-1])
-
-        macd_bullish = macd_now > signal_now
-
-        # VOLUME SURGE
-        avg_volume = float(
-            volume.tail(20).mean()
-        )
-
-        volume_surge = (
-            today_volume > avg_volume * 1.5
-        )
-
-        # SUPPORT RESISTANCE
-        support = int(
-            float(low.tail(20).min())
-        )
-
-        resistance = int(
-            float(high.tail(20).max())
-        )
-
-        # FOREIGN FLOW
-        transaction_value = (
-            close_now * today_volume
-        )
-
-        foreign_flow = "Neutral"
-
-        if (
-            close_now > open_price and
-            today_volume > avg_volume * 2 and
-            close_now >= high_price * 0.98 and
-            transaction_value > 10_000_000_000
-        ):
-
-            foreign_flow = "Strong Inflow"
-
-        elif (
-            close_now < open_price and
-            today_volume > avg_volume * 2
-        ):
-
-            foreign_flow = "Outflow"
-
-        # BANDAR DETECTOR
-        ma20 = float(
-            close
-            .rolling(20)
-            .mean()
-            .values[-1]
-        )
-
-        bandar_detected = False
-
-        if (
-            close_now > ma20 and
-            today_volume > avg_volume * 1.8 and
-            close_now >= high_price * 0.97 and
-            change_percent > 5
-        ):
-
-            bandar_detected = True
-
-        # SCORE
-        score = 0
-
-        if volume_surge:
-            score += 2
-
-        if macd_bullish:
-            score += 2
-
-        if bandar_detected:
-            score += 3
-
-        if foreign_flow == "Strong Inflow":
-            score += 3
-
-        # AI ANALYSIS
-        analysis = ""
-
-        if macd_bullish:
-            analysis += "MACD bullish. "
-
-        if volume_surge:
-            analysis += "Volume surge tinggi. "
-
-        if bandar_detected:
-            analysis += "Terindikasi akumulasi bandar. "
-
-        if foreign_flow == "Strong Inflow":
-            analysis += "Ada indikasi foreign inflow. "
-
-        if current_rsi < 70:
-            analysis += "Belum overbought."
-
-        # OUTPUT
-        result_text = f'''
-🚀 {stock}
-
-📈 Change: {change_percent:.2f}%
-⭐ Score: {score}/10
-
-📊 RSI: {current_rsi}
-📦 Volume Surge: {"YES" if volume_surge else "NO"}
-
-🌍 Foreign Flow:
-{foreign_flow}
-
-🏦 Bandar Detector:
-{"ACCUMULATION DETECTED" if bandar_detected else "NO DETECTION"}
-
-🛡 Support: {support}
-🎯 Resistance: {resistance}
-
-🧠 AI Analysis:
-{analysis}
-'''
-
-        return {
-            "change": change_percent,
-            "score": score,
-            "text": result_text
-        }
-
-    except Exception as e:
-
-        print(f"{stock} ERROR: {e}")
-
-        return None
-
-        # =====================================
-        # FILTER VOLUME
-        # =====================================
-
-        if today_volume < 500000:
-            return None
-
-        # =====================================
-        # RSI 14
-        # =====================================
-
-        delta = df['Close'].diff()
-
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
-
-        avg_gain = gain.rolling(14).mean()
-        avg_loss = loss.rolling(14).mean()
-
-        rs = avg_gain / avg_loss
-
-        rsi = 100 - (100 / (1 + rs))
-
-        current_rsi = round(float(rsi.iloc[-1]), 2)
-
-        # =====================================
-        # MACD
-        # =====================================
-
-        exp1 = df['Close'].ewm(span=12).mean()
-        exp2 = df['Close'].ewm(span=26).mean()
 
         macd = exp1 - exp2
         signal = macd.ewm(span=9).mean()
@@ -280,148 +159,211 @@ def analyze_stock(df, stock):
         macd_now = float(macd.iloc[-1])
         signal_now = float(signal.iloc[-1])
 
-        macd_bullish = macd_now > signal_now
+        macd_bullish = (
+            macd_now > signal_now
+        )
 
-        # =====================================
+        # =========================================
+        # MOVING AVERAGE
+        # =========================================
+
+        ma20 = float(
+            close.rolling(20).mean().iloc[-1]
+        )
+
+        ma50 = float(
+            close.rolling(50).mean().iloc[-1]
+        )
+
+        trend_bullish = ma20 > ma50
+
+        # =========================================
         # VOLUME SURGE
-        # =====================================
+        # =========================================
 
         avg_volume = float(
-            df['Volume'].tail(20).mean()
+            volume.tail(20).mean()
         )
 
         volume_surge = (
-            today_volume > avg_volume * 1.5
+            volume_now > avg_volume * 1.5
         )
 
-        # =====================================
-        # SUPPORT RESISTANCE
-        # =====================================
+        # =========================================
+        # SUPPORT & RESISTANCE
+        # =========================================
 
-        support = int(float(
-            df['Low'].tail(20).min()
-        ))
+        support = int(
+            low.tail(20).min()
+        )
 
-        resistance = int(float(
-            df['High'].tail(20).max()
-        ))
+        resistance = int(
+            high.tail(20).max()
+        )
 
-        # =====================================
+        # =========================================
         # FOREIGN FLOW
-        # =====================================
+        # =========================================
 
         transaction_value = (
-            close_now * today_volume
+            close_now * volume_now
         )
 
         foreign_flow = "Neutral"
 
         if (
-            close_now > open_price and
-            today_volume > avg_volume * 2 and
-            close_now >= high_price * 0.98 and
+            close_now > open_now and
+            volume_now > avg_volume * 2 and
             transaction_value > 10_000_000_000
         ):
 
             foreign_flow = "Strong Inflow"
 
         elif (
-            close_now < open_price and
-            today_volume > avg_volume * 2
+            close_now < open_now and
+            volume_now > avg_volume * 2
         ):
 
             foreign_flow = "Outflow"
 
-        # =====================================
+        # =========================================
         # BANDAR DETECTOR
-        # =====================================
-
-        ma20 = float(
-            df['Close']
-            .rolling(20)
-            .mean()
-            .iloc[-1]
-        )
+        # =========================================
 
         bandar_detected = False
 
         if (
             close_now > ma20 and
-            today_volume > avg_volume * 1.8 and
-            close_now >= high_price * 0.97 and
-            change_percent > 5
+            volume_now > avg_volume * 1.8 and
+            close_now >= high_now * 0.97
         ):
 
             bandar_detected = True
 
-        # =====================================
+        # =========================================
+        # STATUS SIGNAL
+        # =========================================
+
+        status = "WEAK"
+
+        if (
+            change_percent >= 7 and
+            macd_bullish and
+            volume_surge
+        ):
+
+            status = "GOOD"
+
+        if (
+            change_percent >= 10 and
+            macd_bullish and
+            volume_surge and
+            bandar_detected and
+            trend_bullish
+        ):
+
+            status = "STRONG BUY"
+
+        # =========================================
+        # ENTRY TP SL
+        # =========================================
+
+        entry = round(close_now, 0)
+
+        tp1 = round(close_now * 1.05, 0)
+        tp2 = round(close_now * 1.10, 0)
+
+        sl = round(close_now * 0.95, 0)
+
+        risk_reward = round(
+            ((tp2 - entry) / (entry - sl)),
+            2
+        )
+
+        # =========================================
         # SCORE
-        # =====================================
+        # =========================================
 
         score = 0
 
-        if volume_surge:
+        if macd_bullish:
             score += 2
 
-        if macd_bullish:
+        if volume_surge:
             score += 2
 
         if bandar_detected:
             score += 3
 
-        if foreign_flow == "Strong Inflow":
-            score += 3
+        if trend_bullish:
+            score += 2
 
-        # =====================================
+        if foreign_flow == "Strong Inflow":
+            score += 1
+
+        # =========================================
         # AI ANALYSIS
-        # =====================================
+        # =========================================
 
-        analysis = ""
+        analysis = []
 
         if macd_bullish:
-            analysis += "MACD bullish. "
+            analysis.append("MACD bullish")
 
         if volume_surge:
-            analysis += "Volume surge tinggi. "
+            analysis.append("Volume surge tinggi")
 
         if bandar_detected:
-            analysis += "Terindikasi akumulasi bandar. "
+            analysis.append("Akumulasi bandar")
 
-        if foreign_flow == "Strong Inflow":
-            analysis += "Ada indikasi foreign inflow. "
+        if trend_bullish:
+            analysis.append("MA20 > MA50")
 
         if current_rsi < 70:
-            analysis += "Belum overbought."
+            analysis.append("Belum overbought")
 
-        # =====================================
+        ai_text = ". ".join(analysis)
+
+        # =========================================
         # OUTPUT
-        # =====================================
+        # =========================================
 
         result_text = f"""
 🚀 {stock}
 
-📈 Change: {change_percent:.2f}%
+📈 Change: +{change_percent}%
 ⭐ Score: {score}/10
+🔥 Status: {status}
 
 📊 RSI: {current_rsi}
 📦 Volume Surge: {"YES" if volume_surge else "NO"}
+📉 MACD: {"BULLISH" if macd_bullish else "BEARISH"}
 
 🌍 Foreign Flow:
 {foreign_flow}
 
 🏦 Bandar Detector:
-{"ACCUMULATION DETECTED" if bandar_detected else "NO DETECTION"}
+{"ACCUMULATION" if bandar_detected else "NO DETECTION"}
 
 🛡 Support: {support}
 🎯 Resistance: {resistance}
 
+🎯 ENTRY SETUP
+━━━━━━━━━━
+💰 Entry : {int(entry)}
+🎯 TP1   : {int(tp1)}
+🚀 TP2   : {int(tp2)}
+🛑 SL    : {int(sl)}
+
+⚖️ Risk Reward: 1:{risk_reward}
+
 🧠 AI Analysis:
-{analysis}
+{ai_text}
 """
 
         return {
-            "change": change_percent,
             "score": score,
+            "change": change_percent,
             "text": result_text
         }
 
@@ -450,36 +392,34 @@ async def scan(update: Update,
 
             df = yf.download(
                 stock,
-                period="3mo",
+                period="6mo",
                 interval="1d",
                 progress=False,
                 auto_adjust=True,
                 threads=False
             )
 
-            if df.empty or len(df) < 50:
-                continue
-
             result = analyze_stock(df, stock)
 
             if result:
                 results.append(result)
 
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.05)
 
         except Exception as e:
 
             print(f"{stock} ERROR: {e}")
 
+    # TIDAK ADA HASIL
     if not results:
 
         await update.message.reply_text(
-            "❌ Tidak ada saham naik >7% hari ini."
+            "❌ Tidak ada saham >7% hari ini."
         )
 
         return
 
-    # SORT
+    # SORTING
     results = sorted(
         results,
         key=lambda x: (
@@ -489,19 +429,25 @@ async def scan(update: Update,
         reverse=True
     )
 
-    top_25 = results[:25]
-
     # OUTPUT
-    final_text = "🔥 TOP GAINERS IDX\n\n"
+    final_text = "🔥 TOP MOMENTUM IDX 🔥\n\n"
 
-    for item in top_25:
+    for item in results:
 
-        final_text += item["text"]
-        final_text += "\n\n"
+        text_to_add = item["text"] + "\n\n"
 
-    final_text = final_text[:4000]
+        if (
+            len(final_text)
+            + len(text_to_add)
+            > 3900
+        ):
+            break
 
-    await update.message.reply_text(final_text)
+        final_text += text_to_add
+
+    await update.message.reply_text(
+        final_text
+    )
 
 # =========================================
 # COMMAND /START
@@ -513,16 +459,19 @@ async def start(update: Update,
     text = """
 🤖 RENNO STOCK SCANNER
 
-📊 Features:
-- Filter saham naik >7%
-- RSI 14
-- MACD
-- Volume Surge
-- Foreign Flow
-- Bandar Detector
-- AI Analysis
+📊 FEATURES:
+✅ Saham naik >7%
+✅ RSI 14
+✅ MACD
+✅ MA20 vs MA50
+✅ Volume Surge
+✅ Foreign Flow
+✅ Bandar Detector
+✅ Entry TP SL
+✅ AI Analysis
+✅ Status Signal
 
-Commands:
+📌 COMMAND:
 /scan
 """
 
@@ -546,6 +495,6 @@ app.add_handler(
     CommandHandler("scan", scan)
 )
 
-print("BOT RUNNING...")
+print("🚀 BOT RUNNING...")
 
 app.run_polling()
