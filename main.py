@@ -35,7 +35,7 @@ IDX_STOCKS = [
     "GOTO.JK","BUKA.JK","DNET.JK","EDGE.JK",
 
     # PROPERTY
-    "BSDE.JK","PWON.JK","CTRA.JK","SMRA.JK",
+    "BSDE.JK","PWON.JK","CBDK.JK","SMRA.JK",
 
     # BANK
     "BRIS.JK","BBTN.JK","BJBR.JK","BJTM.JK",
