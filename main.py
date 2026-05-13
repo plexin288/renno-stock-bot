@@ -495,6 +495,14 @@ app.add_handler(
     CommandHandler("scan", scan)
 )
 
+app.add_handler(
+    CommandHandler("status", status)
+)
+
+app.add_handler(
+    CommandHandler("help", help_command)
+)
+
 print("🚀 BOT RUNNING...")
 
 app.run_polling()
